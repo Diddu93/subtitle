@@ -1,0 +1,113 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+import os, sys, re, argparse
+from argparse import RawTextHelpFormatter
+from lib.subtitle import Subtitle
+
+
+#
+# Subtitle Command
+#
+def main():
+    #  pre parsing sys.argv for negative value ( eg : "-5s" )
+    argv = []
+    for arg in sys.argv:
+        match = re.search('^(\-|\+|m|p{0,1})([0-9]{1,4})(m|s|ms)$', arg, re.DOTALL)
+        if match:
+            arg = '-- ' + arg
+        argv.append(arg)
+    sys.argv = argv
+
+    commands = (
+        "commands:\n"
+        "i, info		<file>			Displays informations for a subtitle file.\n"
+        "l, list         <path_or_file>		Check a path or file to display informations.\n"
+        "c, check	<path_or_file>		Check a path or file to convert.\n"
+        "b, backup	<file>			Backs up a subtitle file.\n"
+        "r, restore	<file>			Restores a subtitle from its backup file.\n"
+        "s, shift	<file>	<value>		Applies a shift to a subtitle file.\n"
+        "d, delta	<file>	<value>		Applies a delta to a subtitle file.\n"
+    )
+
+    # Instantiate the parser
+    parser = argparse.ArgumentParser(description=commands, prefix_chars='--', formatter_class=RawTextHelpFormatter)
+    parser.add_argument('-v', '--version', action='version', version='%(prog)s 0.1',
+                        help='Shows program version and exits.')
+    parser.add_argument('command', type=str,
+                        help='A command to run either in its long or short format, for example : "c" or "check".')
+    parser.add_argument('path_or_file', type=str, help='A subtitle file or a folder containing subtitle files.',
+                        nargs='?', default=os.getcwd())
+    parser.add_argument('value', type=str,
+                        help='A value to apply for shift and delta could be : "+5s", "m1ms", "-5m", "p34s".',
+                        nargs='?', default=None)
+    parser.add_argument('--start', type=str,
+                        help='A start time to apply from (only for shift and delta commands), for example: "00:21:15,400".')
+    parser.add_argument('--end', type=str,
+                        help='A end time to apply to (only for shift and delta commands), for example: "01:45:21,320".')
+    parser.add_argument('--force', action='store_true',
+                        help='Force file overwrite (only for check and backup commands).')
+    parser.add_argument('--backup', type=str,
+                        help='Choose a specific backup file (only for backup and restore commands).')
+
+    if len(sys.argv) == 1:
+        parser.print_help()
+        sys.exit(1)
+
+    args = parser.parse_args()
+
+    try:
+
+        # info
+        if args.command in ['info', 'i']:
+            print Subtitle(args.path_or_file)
+
+        # list
+        elif args.command in ['list', 'l']:
+            match = re.match('^\.$', args.path_or_file)
+            if match:
+                args.path_or_file = os.getcwd()
+            Subtitle.list(args.path_or_file)
+
+        # check
+        elif args.command in ['check', 'c']:
+            match = re.match('^\.$', args.path_or_file)
+            if match:
+                args.path_or_file = os.getcwd()
+            Subtitle.check(args.path_or_file, args.force)
+
+        # backup
+        elif args.command in ['backup', 'b']:
+            Subtitle.backupFile(args.path_or_file, args.backup, args.force)
+
+        # restore
+        elif args.command in ['restore', 'r']:
+            Subtitle.restoreFile(args.path_or_file, args.backup)
+
+        # shift
+        elif args.command in ['shift', 's'] and args.value is not None:
+            match = re.search('^(\-{2})(\s{1})', args.value, re.DOTALL)
+            if match:
+                args.value = args.value.replace('-- ', '')
+            Subtitle.shiftFile(args.path_or_file, args.value, args.start, args.end)
+
+        # delta
+        elif args.command in ['delta', 'd'] and args.value is not None:
+            match = re.search('^(\-{2})(\s{1})', args.value, re.DOTALL)
+            if match:
+                args.value = args.value.replace('-- ', '')
+            Subtitle.deltaFile(args.path_or_file, args.value, args.start, args.end)
+
+        # help
+        else:
+            parser.print_help()
+            sys.exit(1)
+
+    except Exception, e:
+        print str(e)
+        sys.exit(1)
+
+
+if __name__ == '__main__':
+    main()
+    sys.exit(0)
